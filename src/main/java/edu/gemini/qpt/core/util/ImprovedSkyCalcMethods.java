@@ -73,6 +73,9 @@ public class ImprovedSkyCalcMethods {
         DateTime(Date date) {
             synchronized (cal) { // v. important! [QPT-206]
                 cal.setTime(date);
+
+                System.out.println(cal.get(Calendar.MILLISECOND)/1000.);
+
                 y = (short)cal.get(Calendar.YEAR);
                 mo = (short)(cal.get(Calendar.MONTH) + 1);
                 d = (short)cal.get(Calendar.DAY_OF_MONTH);

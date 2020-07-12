@@ -8,23 +8,32 @@ import gsp.math.ProperMotion
 import gsp.math.Epoch
 import gsp.math.Coordinates
 import gsp.math.skycalc.ImprovedSkyCalc
+import java.time.Instant
 
 object Main {
   val M51 =
     Coordinates.fromHmsDms.getOption("13 29 52.698000 +47 11 42.929988").get
 
+  val Where = Site.GS
+
   def main(args: Array[String]) {
     println("Hello, World!")
-    val calc = new ImprovedSkyCalc(Site.GS)
-    val javaCalc = new JavaSkyCalc(Site.GS)
-    val t = new ju.Date().getTime()
-    val coords: Long => WorldCoords = _ =>
+    val calc = new ImprovedSkyCalc(Where)
+    val javaCalc = new JavaSkyCalc(Where)
+
+    val now = Instant.now()
+    val judNow = ju.Date.from(now)
+    val t = judNow.getTime
+
+    val coords =
       new WorldCoords(
         M51.ra.toAngle.toDoubleDegrees,
         M51.dec.toAngle.toDoubleDegrees
       )
-    calc.calculate(coords.apply(t), new ju.Date(t), false)
-    javaCalc.calculate(coords.apply(t), new ju.Date(t), false)
+
+    calc.calculate(coords, now, false)
+    javaCalc.calculate(coords, judNow, false)
+
     println(calc.getAltitude)
     println(javaCalc.getAltitude)
   }

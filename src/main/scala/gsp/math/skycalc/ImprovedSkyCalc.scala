@@ -3,6 +3,7 @@ package gsp.math.skycalc
 import edu.gemini.spModel.core.Site
 import java.{util => ju}
 import jsky.coords.WorldCoords
+import java.time.Instant
 
 /**
   * Improved version of SkyCalc that supports lunar calculations. All instance stuff is here;
@@ -33,7 +34,7 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
 
   // caching for calculate()
   private var cachedCoordinates: WorldCoords = null
-  private var cachedDate: ju.Date = null
+  private var cachedInstant: Instant = null
   private var cachedCalculateMoon: Boolean = false
 
   def this(site: Site) {
@@ -45,18 +46,18 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
 
   def calculate(
       obj: WorldCoords,
-      date: ju.Date,
+      instant: Instant,
       calculateMoon: Boolean
   ): Unit = { // Early exit if the parameters haven't changed.
     if (
-      obj.equals(cachedCoordinates) && date.equals(
-        cachedDate
+      obj.equals(cachedCoordinates) && instant.equals(
+        cachedInstant
       ) && calculateMoon == cachedCalculateMoon
     ) return
     cachedCoordinates = obj
-    cachedDate = date
+    cachedInstant = instant
     cachedCalculateMoon = calculateMoon
-    val dateTime = DateTime(date)
+    val dateTime = DateTime(instant)
     val jdut = new DoubleRef
     val sid = new DoubleRef
     val curepoch = new DoubleRef

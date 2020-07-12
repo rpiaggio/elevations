@@ -2,8 +2,11 @@ package gsp.math.skycalc
 
 import java.util.Calendar
 import java.util.TimeZone
+import java.time.ZoneId
 import java.{util => ju}
 import java.sql.Date
+import java.time.ZoneOffset
+import java.time.Instant
 
 class ImprovedSkyCalcMethods {
 
@@ -44,7 +47,11 @@ class ImprovedSkyCalcMethods {
     21.16, 23.62, 24.02, 23.93, 24.33, 26.77, 29.15, 31.07, 33.15, 35.73, 40.18,
     45.48, 50.54, 54.34, 56.86, 60.78, 62.97)
 
-  protected val UT: TimeZone = TimeZone.getTimeZone("UT")
+  protected val utTZ: TimeZone = TimeZone.getTimeZone("UT")
+
+  private val UT: ZoneId = ZoneId.of("UT")
+  // private val NanosToDecimal: Double = 10e-10
+  private val MillisPerNano: Int = 1_000_000
 
   final protected class DoubleRef(var d: Double) {
     def this() {
@@ -54,31 +61,48 @@ class ImprovedSkyCalcMethods {
     override def toString: String = d.toString
   }
 
-  protected class DateTime {
-    final var y = 0
-    final var mo = 0
-    final var d = 0
-    final var h = 0
-    final var mn = 0
-    final var s = .0
-  }
+  protected case class DateTime(
+      y: Short,
+      mo: Short,
+      d: Short,
+      h: Short,
+      mn: Short,
+      s: Double
+  )
 
   protected object DateTime {
-    private val cal = Calendar.getInstance(UT)
+    private val cal = Calendar.getInstance(utTZ)
 
+    def apply(i: Instant): DateTime = {
+      val zdt = i.atZone(UT)
+
+      println(zdt.getNano / MillisPerNano / 1000.0)
+
+      DateTime(
+        y = zdt.getYear.toShort,
+        mo = zdt.getMonthValue.toShort,
+        d = zdt.getDayOfMonth.toShort,
+        h = zdt.getHour.toShort,
+        mn = zdt.getMinute.toShort,
+        // s = zdt.getSecond + zdt.getNano * NanosToDecimal // Should we keep extra precision?
+        s = zdt.getSecond + zdt.getNano / MillisPerNano / 1000.0
+      )
+    }
+
+    // TODO Migrate LST conversion before removing this.
     def apply(date: ju.Date): DateTime = {
       DateTime.cal.synchronized { // v. important! [QPT-206]
         DateTime.cal.setTime(date)
-        new DateTime {
-          y = DateTime.cal.get(Calendar.YEAR).toShort
-          mo = (DateTime.cal.get(Calendar.MONTH) + 1).toShort
-          d = DateTime.cal.get(Calendar.DAY_OF_MONTH).toShort
-          h = DateTime.cal.get(Calendar.HOUR_OF_DAY).toShort
-          mn = DateTime.cal.get(Calendar.MINUTE).toShort
-          s = DateTime.cal.get(Calendar.SECOND) + DateTime.cal.get(
+        DateTime(
+          y = DateTime.cal.get(Calendar.YEAR).toShort,
+          mo = (DateTime.cal.get(Calendar.MONTH) + 1).toShort,
+          d = DateTime.cal.get(Calendar.DAY_OF_MONTH).toShort,
+          h = DateTime.cal.get(Calendar.HOUR_OF_DAY).toShort,
+          mn = DateTime.cal.get(Calendar.MINUTE).toShort,
+          s = DateTime.cal.get(Calendar.SECOND) + cal.get(
             Calendar.MILLISECOND
           ) / 1000.0
-        }
+        )
       }
     }
   }
@@ -87,7 +111,7 @@ class ImprovedSkyCalcMethods {
     * Return the LST time as a Date object for the given LST hours and date.
     */
   protected def getLst(lstHours: Double, date: ju.Date): ju.Date = {
-    val cal = Calendar.getInstance(UT)
+    val cal = Calendar.getInstance(utTZ)
     cal.setTime(date)
     val h = cal.get(Calendar.HOUR_OF_DAY)
     val nextDay = lstHours < h
