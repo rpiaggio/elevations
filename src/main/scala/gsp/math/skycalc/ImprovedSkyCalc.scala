@@ -1,16 +1,15 @@
 package gsp.math.skycalc
 
-import edu.gemini.spModel.core.Site
+import gem.enum.Site
 import java.time.Instant
 import java.time.ZonedDateTime
 import gsp.math.Coordinates
 
 /**
   * Improved version of SkyCalc that supports lunar calculations. All instance stuff is here;
-  * the superclass is exclusively static stuff.
+  * the trait is exclusively static stuff.
   * @author brighton, rnorris
   */
-// @SuppressWarnings("serial")
 final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
 
   // Site parameters
@@ -39,8 +38,8 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
 
   def this(site: Site) = {
     this()
-    hoursLongitude = -site.longitude / 15.0
-    degreesLatitude = site.latitude
+    hoursLongitude = -site.longitude.toDoubleDegrees / 15.0
+    degreesLatitude = site.latitude.toDoubleDegrees
     siteAltitude = site.altitude
   }
 
