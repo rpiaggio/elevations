@@ -1,14 +1,8 @@
 package gsp.math.skycalc
 
-import java.util.Calendar
-import java.util.TimeZone
-import java.time.ZoneId
-import java.{util => ju}
-import java.sql.Date
-import java.time.ZoneOffset
-import java.time.Instant
+import java.time._
 
-class ImprovedSkyCalcMethods {
+trait ImprovedSkyCalcMethods {
 
   // defined quantities for apparent place transforms ..
   protected val XFORM_FROMSTD = 1
@@ -47,14 +41,13 @@ class ImprovedSkyCalcMethods {
     21.16, 23.62, 24.02, 23.93, 24.33, 26.77, 29.15, 31.07, 33.15, 35.73, 40.18,
     45.48, 50.54, 54.34, 56.86, 60.78, 62.97)
 
-  protected val utTZ: TimeZone = TimeZone.getTimeZone("UT")
-
   private val UT: ZoneId = ZoneId.of("UT")
-  // private val NanosToDecimal: Double = 10e-10
-  private val MillisPerNano: Int = 1_000_000
+  // private val NanosPerSecond: Double = 1e9
+  private val MillisPerNano: Int =
+    1_000_000 // Deliberately an Int to drop Nano precision
 
   final protected class DoubleRef(var d: Double) {
-    def this() {
+    def this() = {
       this(0.0)
     }
 
@@ -71,12 +64,10 @@ class ImprovedSkyCalcMethods {
   )
 
   protected object DateTime {
-    private val cal = Calendar.getInstance(utTZ)
-
     def apply(i: Instant): DateTime = {
       val zdt = i.atZone(UT)
 
-      println(zdt.getNano / MillisPerNano / 1000.0)
+      // println(zdt.getNano / MillisPerNano / 1000.0)
 
       DateTime(
         y = zdt.getYear.toShort,
@@ -84,57 +75,35 @@ class ImprovedSkyCalcMethods {
         d = zdt.getDayOfMonth.toShort,
         h = zdt.getHour.toShort,
         mn = zdt.getMinute.toShort,
-        // s = zdt.getSecond + zdt.getNano * NanosToDecimal // Should we keep extra precision?
+        // s = zdt.getSecond + zdt.getNano / NanosPerSecond // Should we keep extra precision?
         s = zdt.getSecond + zdt.getNano / MillisPerNano / 1000.0
       )
-    }
-
-    // TODO Migrate LST conversion before removing this.
-    def apply(date: ju.Date): DateTime = {
-      DateTime.cal.synchronized { // v. important! [QPT-206]
-        DateTime.cal.setTime(date)
-        DateTime(
-          y = DateTime.cal.get(Calendar.YEAR).toShort,
-          mo = (DateTime.cal.get(Calendar.MONTH) + 1).toShort,
-          d = DateTime.cal.get(Calendar.DAY_OF_MONTH).toShort,
-          h = DateTime.cal.get(Calendar.HOUR_OF_DAY).toShort,
-          mn = DateTime.cal.get(Calendar.MINUTE).toShort,
-          s = DateTime.cal.get(Calendar.SECOND) + cal.get(
-            Calendar.MILLISECOND
-          ) / 1000.0
-        )
-      }
     }
   }
 
   /**
-    * Return the LST time as a Date object for the given LST hours and date.
+    * Return the LST time as a ZonedDateTime object for the given instant.
     */
-  protected def getLst(lstHours: Double, date: ju.Date): ju.Date = {
-    val cal = Calendar.getInstance(utTZ)
-    cal.setTime(date)
-    val h = cal.get(Calendar.HOUR_OF_DAY)
+  protected def getLst(lstHours: Double, instant: Instant): ZonedDateTime = {
+    val zdt = instant.atZone(UT)
+    val h = zdt.getHour
     val nextDay = lstHours < h
-    setHours(cal, lstHours, nextDay)
-    cal.getTime
+    setHours(zdt, lstHours, nextDay)
   }
 
-  protected def setHours(
-      cal: Calendar,
+  private def setHours(
+      zdt: ZonedDateTime,
       hours: Double,
       nextDay: Boolean
-  ): Unit = {
+  ): ZonedDateTime = {
     val h = hours.toInt
     val md = (hours - h) * 60.0
     val min = md.toInt
     val sd = (md - min) * 60.0
     val sec = sd.toInt
     val ms = ((sd - sec) * 1000).toInt
-    cal.set(Calendar.HOUR_OF_DAY, h)
-    cal.set(Calendar.MINUTE, min)
-    cal.set(Calendar.SECOND, sec)
-    cal.set(Calendar.MILLISECOND, ms)
-    if (nextDay) cal.add(Calendar.HOUR_OF_DAY, 24)
+    val newZDT = zdt.`with`(LocalTime.of(h, min, sec, ms * MillisPerNano))
+    if (nextDay) newZDT.plusHours(24) else newZDT
   }
 
   /**
@@ -990,7 +959,7 @@ class ImprovedSkyCalcMethods {
     jdint = (365.25 * (date.y + yr1)).toLong /* truncates */
     inter = (30.6001 * (date.mo + mo1)).toLong
     jdint = jdint + inter + date.d + jdzpt
-    jd = jdint
+    jd = jdint.toDouble
     jdfrac = date.h / 24.0 + date.mn / 1440.0 + date.s / SEC_IN_DAY
     if (jdfrac < 0.5) {
       jdint -= 1
@@ -1019,7 +988,7 @@ class ImprovedSkyCalcMethods {
     var sid_int = 0L
     jdin = jd.toLong /* fossil code from earlier package which
                                        split jd into integer and fractional parts ... */
-    jdint = jdin
+    jdint = jdin.toDouble
     jdfrac = jd - jdint
     if (jdfrac < 0.5) {
       jdmid = jdint - 0.5

@@ -16,7 +16,7 @@ object Main {
 
   val Where = Site.GS
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]) = {
     println("Hello, World!")
     val calc = new ImprovedSkyCalc(Where)
     val javaCalc = new JavaSkyCalc(Where)
@@ -36,5 +36,8 @@ object Main {
 
     println(calc.getAltitude)
     println(javaCalc.getAltitude)
+
+    println(ju.Date.from(calc.getLst(now).toInstant))
+    println(javaCalc.getLst(judNow))
   }
 }

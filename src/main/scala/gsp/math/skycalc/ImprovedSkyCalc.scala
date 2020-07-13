@@ -1,9 +1,9 @@
 package gsp.math.skycalc
 
 import edu.gemini.spModel.core.Site
-import java.{util => ju}
 import jsky.coords.WorldCoords
 import java.time.Instant
+import java.time.ZonedDateTime
 
 /**
   * Improved version of SkyCalc that supports lunar calculations. All instance stuff is here;
@@ -37,7 +37,7 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
   private var cachedInstant: Instant = null
   private var cachedCalculateMoon: Boolean = false
 
-  def this(site: Site) {
+  def this(site: Site) = {
     this()
     hoursLongitude = -site.longitude / 15.0
     degreesLatitude = site.latitude
@@ -191,13 +191,13 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
   }
 
   /**
-    * Return the LST time for the given UT time at the given site.
+    * Return the LST time for the given instant at the given site.
     */
-  def getLst(date: ju.Date): ju.Date = {
-    val dateTime = DateTime(date)
+  def getLst(instant: Instant): ZonedDateTime = {
+    val dateTime = DateTime(instant)
     val jd = date_to_jd(dateTime)
     val lstHours = lst(jd, hoursLongitude)
-    getLst(lstHours, date)
+    getLst(lstHours, instant)
   }
 
   def getAltitude: Double = altitude

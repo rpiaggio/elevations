@@ -15,6 +15,8 @@ libraryDependencies ++= Seq(
 
 mainClass in (Compile, run) := Some("Main")
 
+scalacOptions ++= Seq("-deprecation")
+
 // don't publish anything
 publish := {}
 publishLocal := {}

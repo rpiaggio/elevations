@@ -74,7 +74,7 @@ public class ImprovedSkyCalcMethods {
             synchronized (cal) { // v. important! [QPT-206]
                 cal.setTime(date);
 
-                System.out.println(cal.get(Calendar.MILLISECOND)/1000.);
+                // System.out.println(cal.get(Calendar.MILLISECOND)/1000.);
 
                 y = (short)cal.get(Calendar.YEAR);
                 mo = (short)(cal.get(Calendar.MONTH) + 1);
