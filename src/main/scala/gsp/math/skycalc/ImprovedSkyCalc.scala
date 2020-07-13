@@ -1,9 +1,9 @@
 package gsp.math.skycalc
 
 import edu.gemini.spModel.core.Site
-import jsky.coords.WorldCoords
 import java.time.Instant
 import java.time.ZonedDateTime
+import gsp.math.Coordinates
 
 /**
   * Improved version of SkyCalc that supports lunar calculations. All instance stuff is here;
@@ -33,7 +33,7 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
   private var lunarElevation = .0
 
   // caching for calculate()
-  private var cachedCoordinates: WorldCoords = null
+  private var cachedCoordinates: Coordinates = null
   private var cachedInstant: Instant = null
   private var cachedCalculateMoon: Boolean = false
 
@@ -45,16 +45,16 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
   }
 
   def calculate(
-      obj: WorldCoords,
+      coords: Coordinates,
       instant: Instant,
       calculateMoon: Boolean
   ): Unit = { // Early exit if the parameters haven't changed.
     if (
-      obj.equals(cachedCoordinates) && instant.equals(
+      coords.equals(cachedCoordinates) && instant.equals(
         cachedInstant
       ) && calculateMoon == cachedCalculateMoon
     ) return
-    cachedCoordinates = obj
+    cachedCoordinates = coords
     cachedInstant = instant
     cachedCalculateMoon = calculateMoon
     val dateTime = DateTime(instant)
@@ -62,8 +62,8 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
     val sid = new DoubleRef
     val curepoch = new DoubleRef
     setup_time_place(dateTime, hoursLongitude, jdut, sid, curepoch)
-    val objra = obj.getRaDeg / 15
-    val objdec = obj.getDecDeg
+    val objra = coords.ra.toAngle.toDoubleDegrees / 15
+    val objdec = coords.dec.toAngle.toDoubleDegrees
     val objepoch = 2000.0
     getCircumstances(
       objra,

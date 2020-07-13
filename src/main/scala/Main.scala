@@ -25,14 +25,14 @@ object Main {
     val judNow = ju.Date.from(now)
     val t = judNow.getTime
 
-    val coords =
+    val wcoords =
       new WorldCoords(
         M51.ra.toAngle.toDoubleDegrees,
         M51.dec.toAngle.toDoubleDegrees
       )
 
-    calc.calculate(coords, now, false)
-    javaCalc.calculate(coords, judNow, false)
+    calc.calculate(M51, now, false)
+    javaCalc.calculate(wcoords, judNow, false)
 
     println(calc.getAltitude)
     println(javaCalc.getAltitude)
