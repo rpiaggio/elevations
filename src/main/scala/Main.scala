@@ -1,5 +1,5 @@
 import cats.implicits._
-import edu.gemini.qpt.core.util.{ImprovedSkyCalc => JavaSkyCalc}
+import edu.gemini.skycalc.{ImprovedSkyCalcTest => JavaSkyCalcTest}
 import edu.gemini.spModel.core.{Site => SpSite}
 import java.{util => ju}
 import jsky.coords.WorldCoords
@@ -10,6 +10,7 @@ import gsp.math.Coordinates
 import gsp.math.skycalc.ImprovedSkyCalc
 import java.time.Instant
 import gem.enum.Site
+import java.time.ZonedDateTime
 
 object Main {
   val M51 =
@@ -21,28 +22,35 @@ object Main {
       coords.dec.toAngle.toDoubleDegrees
     )
 
+  private val NanosPerMillis: Long = 1_000_000
+
+  private def truncateInstantToMillis(i: Instant): Instant = {
+    Instant.ofEpochMilli(i.toEpochMilli / NanosPerMillis * NanosPerMillis)
+  }
+
   def main(args: Array[String]) = {
     println("Hello, World!")
 
     val site = Site.GN
-    val spSite = SpSite.GN
 
     val coords = M51
 
     val calc = new ImprovedSkyCalc(site)
-    val javaCalc = new JavaSkyCalc(spSite)
+    val javaCalc = new JavaSkyCalcTest(
+      site.longitude.toDoubleDegrees,
+      site.latitude.toDoubleDegrees,
+      site.altitude
+    )
 
-    val now = Instant.now()
-    val judNow = ju.Date.from(now)
-    val t = judNow.getTime
+    val now = truncateInstantToMillis(Instant.now())
 
     calc.calculate(coords, now, false)
-    javaCalc.calculate(wCoords(coords), judNow, false)
+    javaCalc.calculate(wCoords(coords), now, false)
 
     println(calc.getAltitude)
     println(javaCalc.getAltitude)
 
-    println(ju.Date.from(calc.getLst(now).toInstant))
-    println(javaCalc.getLst(judNow))
+    // println(calc.getLst(now))
+    // println(javaCalc.getLst(now))
   }
 }

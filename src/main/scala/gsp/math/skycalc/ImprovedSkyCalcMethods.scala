@@ -42,9 +42,7 @@ trait ImprovedSkyCalcMethods {
     45.48, 50.54, 54.34, 56.86, 60.78, 62.97)
 
   private val UT: ZoneId = ZoneId.of("UT")
-  // private val NanosPerSecond: Double = 1e9
-  private val MillisPerNano: Int =
-    1_000_000 // Deliberately an Int to drop Nano precision
+  private val NanosPerSecond: Double = 1e9
 
   final protected class DoubleRef(var d: Double) {
     def this() = {
@@ -67,16 +65,14 @@ trait ImprovedSkyCalcMethods {
     def apply(i: Instant): DateTime = {
       val zdt = i.atZone(UT)
 
-      // println(zdt.getNano / MillisPerNano / 1000.0)
-
       DateTime(
         y = zdt.getYear.toShort,
         mo = zdt.getMonthValue.toShort,
         d = zdt.getDayOfMonth.toShort,
         h = zdt.getHour.toShort,
         mn = zdt.getMinute.toShort,
-        // s = zdt.getSecond + zdt.getNano / NanosPerSecond // Should we keep extra precision?
-        s = zdt.getSecond + zdt.getNano / MillisPerNano / 1000.0
+        s =
+          zdt.getSecond + zdt.getNano / NanosPerSecond
       )
     }
   }
@@ -101,8 +97,8 @@ trait ImprovedSkyCalcMethods {
     val min = md.toInt
     val sd = (md - min) * 60.0
     val sec = sd.toInt
-    val ms = ((sd - sec) * 1000).toInt
-    val newZDT = zdt.`with`(LocalTime.of(h, min, sec, ms * MillisPerNano))
+    val ns = ((sd - sec) * NanosPerSecond).toInt
+    val newZDT = zdt.`with`(LocalTime.of(h, min, sec, ns))
     if (nextDay) newZDT.plusHours(24) else newZDT
   }
 
