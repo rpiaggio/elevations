@@ -14,12 +14,12 @@ import gsp.math.Coordinates
   * the trait is exclusively static stuff.
   * @author brighton, rnorris
   */
-final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
+final class ImprovedSkyCalc(site: Site) extends ImprovedSkyCalcMethods {
 
   // Site parameters
-  private var hoursLongitude  = .0
-  private var degreesLatitude = .0
-  private var siteAltitude    = .0
+  private var hoursLongitude  = -site.longitude.toDoubleDegrees / 15.0
+  private var degreesLatitude = site.latitude.toDoubleDegrees
+  private var siteAltitude    = site.altitude.toDouble
 
   // calculated results
   private var altitude                             = .0
@@ -39,13 +39,6 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
   private var cachedCoordinates: Coordinates = null
   private var cachedInstant: Instant         = null
   private var cachedCalculateMoon: Boolean   = false
-
-  def this(site: Site) = {
-    this()
-    hoursLongitude = -site.longitude.toDoubleDegrees / 15.0
-    degreesLatitude = site.latitude.toDoubleDegrees
-    siteAltitude = site.altitude.toDouble
-  }
 
   def calculate(
     coords:        Coordinates,
