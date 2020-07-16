@@ -1,30 +1,35 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package gsp.math.skycalc
 
 import java.time._
 
+import scala.annotation.unused
+
 trait ImprovedSkyCalcMethods {
 
   // defined quantities for apparent place transforms ..
-  protected val XFORM_FROMSTD = 1
+  protected val XFORM_FROMSTD      = 1
   protected val XFORM_TOSTDEP: Int = -1
-  protected val XFORM_JUSTPRE = 1
-  protected val XFORM_DOAPPAR = 0
+  protected val XFORM_JUSTPRE      = 1
+  protected val XFORM_DOAPPAR      = 0
 
   // some (not all) physical, mathematical, and astronomical constants used are defined here.
-  protected val TWOPI = 6.28318530717959
+  protected val TWOPI     = 6.28318530717959
   protected val PI_OVER_2 = 1.57079632679490 // From Abramowitz & Stegun
 
   protected val ARCSEC_IN_RADIAN = 206264.8062471
-  protected val DEG_IN_RADIAN = 57.2957795130823
-  protected val HRS_IN_RADIAN = 3.819718634205
-  protected val KMS_AUDAY = 1731.45683633 // km per sec in 1 AU/day
+  protected val DEG_IN_RADIAN    = 57.2957795130823
+  protected val HRS_IN_RADIAN    = 3.819718634205
+  protected val KMS_AUDAY        = 1731.45683633 // km per sec in 1 AU/day
 
   protected val SPEED_OF_LIGHT = 299792.458 // in km per sec ... exact.
 
   protected val J2000 = 2451545.0 // Julian date at standard epoch
 
   protected val SEC_IN_DAY = 86400.0
-  protected val FLATTEN = 0.003352813 // flattening of earth, 1/298.257
+  protected val FLATTEN    = 0.003352813 // flattening of earth, 1/298.257
 
   protected val EQUAT_RAD = 6378137.0 // equatorial radius of earth, meters
 
@@ -37,12 +42,14 @@ trait ImprovedSkyCalcMethods {
     0.05 // used in numerical differentiation to find earth velocity
 
   // Constants needed in etcorr method
-  protected val DELTS: Array[Double] = Array[Double](-2.72, 3.86, 10.46, 17.20,
-    21.16, 23.62, 24.02, 23.93, 24.33, 26.77, 29.15, 31.07, 33.15, 35.73, 40.18,
-    45.48, 50.54, 54.34, 56.86, 60.78, 62.97)
+  protected val DELTS: Array[Double] =
+    Array[Double](-2.72, 3.86, 10.46, 17.20, 21.16, 23.62, 24.02, 23.93, 24.33, 26.77, 29.15, 31.07,
+      33.15, 35.73, 40.18, 45.48, 50.54, 54.34, 56.86, 60.78, 62.97)
 
-  private val UT: ZoneId = ZoneId.of("UT")
-  private val NanosPerSecond: Double = 1e9
+  private val UT: ZoneId         = ZoneId.of("UT")
+  // private val NanosPerSecond: Double = 1e9
+  private val MillisPerNano: Int =
+    1_000_000 // Deliberately an Int to drop Nano precision
 
   final protected class DoubleRef(var d: Double) {
     def this() = {
@@ -53,17 +60,19 @@ trait ImprovedSkyCalcMethods {
   }
 
   protected case class DateTime(
-      y: Short,
-      mo: Short,
-      d: Short,
-      h: Short,
-      mn: Short,
-      s: Double
+    y:  Short,
+    mo: Short,
+    d:  Short,
+    h:  Short,
+    mn: Short,
+    s:  Double
   )
 
   protected object DateTime {
     def apply(i: Instant): DateTime = {
       val zdt = i.atZone(UT)
+
+      // println(zdt.getNano / MillisPerNano / 1000.0)
 
       DateTime(
         y = zdt.getYear.toShort,
@@ -71,8 +80,8 @@ trait ImprovedSkyCalcMethods {
         d = zdt.getDayOfMonth.toShort,
         h = zdt.getHour.toShort,
         mn = zdt.getMinute.toShort,
-        s =
-          zdt.getSecond + zdt.getNano / NanosPerSecond
+        // s = zdt.getSecond + zdt.getNano / NanosPerSecond // Should we keep extra precision?
+        s = zdt.getSecond + zdt.getNano / MillisPerNano / 1000.0
       )
     }
   }
@@ -81,24 +90,24 @@ trait ImprovedSkyCalcMethods {
     * Return the LST time as a ZonedDateTime object for the given instant.
     */
   protected def getLst(lstHours: Double, instant: Instant): ZonedDateTime = {
-    val zdt = instant.atZone(UT)
-    val h = zdt.getHour
+    val zdt     = instant.atZone(UT)
+    val h       = zdt.getHour
     val nextDay = lstHours < h
     setHours(zdt, lstHours, nextDay)
   }
 
   private def setHours(
-      zdt: ZonedDateTime,
-      hours: Double,
-      nextDay: Boolean
+    zdt:     ZonedDateTime,
+    hours:   Double,
+    nextDay: Boolean
   ): ZonedDateTime = {
-    val h = hours.toInt
-    val md = (hours - h) * 60.0
-    val min = md.toInt
-    val sd = (md - min) * 60.0
-    val sec = sd.toInt
-    val ns = ((sd - sec) * NanosPerSecond).toInt
-    val newZDT = zdt.`with`(LocalTime.of(h, min, sec, ns))
+    val h      = hours.toInt
+    val md     = (hours - h) * 60.0
+    val min    = md.toInt
+    val sd     = (md - min) * 60.0
+    val sec    = sd.toInt
+    val ms     = ((sd - sec) * 1000).toInt
+    val newZDT = zdt.`with`(LocalTime.of(h, min, sec, ms * MillisPerNano))
     if (nextDay) newZDT.plusHours(24) else newZDT
   }
 
@@ -122,11 +131,11 @@ trait ImprovedSkyCalcMethods {
     * change; returns zero if successful.
     */
   protected def setup_time_place(
-      date: DateTime,
-      longit: Double,
-      jdut: DoubleRef,
-      sid: DoubleRef,
-      curepoch: DoubleRef
+    date:     DateTime,
+    longit:   Double,
+    jdut:     DoubleRef,
+    sid:      DoubleRef,
+    curepoch: DoubleRef
   ): Short = {
     val jd = date_to_jd(date)
     sid.d = lst(jd, longit)
@@ -136,51 +145,51 @@ trait ImprovedSkyCalcMethods {
   }
 
   protected def cooxform(
-      rin: Double,
-      din: Double,
-      std_epoch: Double,
-      date_epoch: Double,
-      rout: DoubleRef,
-      dout: DoubleRef,
-      just_precess: Int,
-      from_std: Int
+    rin:          Double,
+    din:          Double,
+    std_epoch:    Double,
+    date_epoch:   Double,
+    rout:         DoubleRef,
+    dout:         DoubleRef,
+    just_precess: Int,
+    from_std:     Int
   ): Unit = {
     /* all the 3-d stuff is declared as [4] 'cause I'm not using the
              zeroth element. */
-    var ti = .0
-    var tf = .0
-    var zeta = .0
-    var z = .0
-    var theta = .0
+    var ti         = .0
+    var tf         = .0
+    var zeta       = .0
+    var z          = .0
+    var theta      = .0
     /* all as per  Taff */
-    var cosz = .0
-    var coszeta = .0
-    var costheta = .0
-    var sinz = .0
-    var sinzeta = .0
-    var sintheta = .0
+    var cosz       = .0
+    var coszeta    = .0
+    var costheta   = .0
+    var sinz       = .0
+    var sinzeta    = .0
+    var sintheta   = .0
     /* ftns */
-    val p = Array.ofDim[Double](4, 4)
+    val p          = Array.ofDim[Double](4, 4)
     /* elements of the rotation matrix */
-    val n = Array.ofDim[Double](4, 4)
+    val n          = Array.ofDim[Double](4, 4)
     /* elements of the nutation matrix */
-    val r = Array.ofDim[Double](4, 4)
+    val r          = Array.ofDim[Double](4, 4)
     /* their product */
-    val t = Array.ofDim[Double](4, 4)
+    val t          = Array.ofDim[Double](4, 4)
     /* temporary matrix for inversion .... */
-    var radian_ra = .0
+    var radian_ra  = .0
     var radian_dec = .0
     /* nutation angles in radians */
-    val del_psi = new DoubleRef
-    val del_eps = new DoubleRef
-    var eps = .0
-    val orig = new Array[Double](4)
+    val del_psi    = new DoubleRef
+    val del_eps    = new DoubleRef
+    var eps        = .0
+    val orig       = new Array[Double](4)
     /* original unit vector */
-    val fin = new Array[Double](4)
+    val fin        = new Array[Double](4)
     /* final unit vector */
-    var i = 0
-    var j = 0
-    var k = 0
+    var i          = 0
+    var j          = 0
+    var k          = 0
     ti = (std_epoch - 2000.0) / 100.0
     tf = (date_epoch - 2000.0 - 100.0 * ti) / 100.0
     zeta =
@@ -225,18 +234,12 @@ trait ImprovedSkyCalcMethods {
       n(3)(2) = -1.0 * n(2)(3)
       /* form product of precession and nutation matrices ... */
       i = 1
-      while ({
-        i <= 3
-      }) {
+      while (i <= 3) {
         j = 1
-        while ({
-          j <= 3
-        }) {
+        while (j <= 3) {
           r(i)(j) = 0.0
           k = 1
-          while ({
-            k <= 3
-          }) {
+          while (k <= 3) {
             r(i)(j) += p(i)(k) * n(k)(j)
 
             k += 1
@@ -250,13 +253,9 @@ trait ImprovedSkyCalcMethods {
     } else {
       /* if you're just precessing .... */
       i = 1
-      while ({
-        i <= 3
-      }) {
+      while (i <= 3) {
         j = 1
-        while ({
-          j <= 3
-        }) {
+        while (j <= 3) {
           r(i)(j) = p(i)(j) /* simply copy precession matrix */
 
           j += 1
@@ -270,13 +269,9 @@ trait ImprovedSkyCalcMethods {
       /* if you're transforming back to std
                               epoch, rather than forward from std */
       i = 1
-      while ({
-        i <= 3
-      }) {
+      while (i <= 3) {
         j = 1
-        while ({
-          j <= 3
-        }) {
+        while (j <= 3) {
           t(i)(j) = r(j)(i) /* store transpose ... */
 
           j += 1
@@ -285,13 +280,9 @@ trait ImprovedSkyCalcMethods {
         i += 1
       }
       i = 1
-      while ({
-        i <= 3
-      }) {
+      while (i <= 3) {
         j = 1
-        while ({
-          j <= 3
-        }) {
+        while (j <= 3) {
           r(i)(j) = t(i)(j) /* replace original w/ transpose.*/
 
           j += 1
@@ -306,20 +297,15 @@ trait ImprovedSkyCalcMethods {
     orig(1) = Math.cos(radian_dec) * Math.cos(radian_ra)
     orig(2) = Math.cos(radian_dec) * Math.sin(radian_ra)
     orig(3) = Math.sin(radian_dec)
-    if (from_std == XFORM_TOSTDEP && just_precess == XFORM_DOAPPAR) {
+    if (from_std == XFORM_TOSTDEP && just_precess == XFORM_DOAPPAR)
       /* if you're transforming from jd to std epoch, and doing apparent place,
             first step is to de-aberrate while still in epoch of date ... */
       aberrate(date_epoch, orig, from_std)
-    }
     i = 1
-    while ({
-      i <= 3
-    }) {
+    while (i <= 3) {
       fin(i) = 0.0
       j = 1
-      while ({
-        j <= 3
-      }) {
+      while (j <= 3) {
         fin(i) += r(i)(j) * orig(j)
 
         j += 1
@@ -327,12 +313,11 @@ trait ImprovedSkyCalcMethods {
 
       i += 1
     }
-    if (from_std == XFORM_FROMSTD && just_precess == XFORM_DOAPPAR) {
+    if (from_std == XFORM_FROMSTD && just_precess == XFORM_DOAPPAR)
       /* if you're transforming from std epoch to jd,
                   last step is to apply aberration correction once you're in
                   equinox of that jd. */
       aberrate(date_epoch, fin, from_std)
-    }
     /* convert back to spherical polar coords */
     xyz_cel(fin(1), fin(2), fin(3), rout, dout)
   }
@@ -347,17 +332,17 @@ trait ImprovedSkyCalcMethods {
     * Nutation parameters are returned in radians.
     */
   protected def nutation_params(
-      date_epoch: Double,
-      del_psi: DoubleRef,
-      del_ep: DoubleRef
+    date_epoch: Double,
+    del_psi:    DoubleRef,
+    del_ep:     DoubleRef
   ): Unit = {
-    var T = .0
-    var jd = .0
-    var L = .0
+    var T      = .0
+    var jd     = .0
+    var L      = .0
     var Lprime = .0
-    var M = .0
+    var M      = .0
     var Mprime = .0
-    var Omega = .0
+    var Omega  = .0
     jd = (date_epoch - 2000.0) * 365.25 + J2000
     T = (jd - 2415020.0) / 36525.0
     L = 279.6967 + (36000.7689 + 0.000303 * T) * T
@@ -403,11 +388,11 @@ trait ImprovedSkyCalcMethods {
     * which was transcribed from a PL/I routine ....
     */
   protected def xyz_cel(
-      x0: Double,
-      y0: Double,
-      z0: Double,
-      ra: DoubleRef,
-      dec: DoubleRef
+    x0:  Double,
+    y0:  Double,
+    z0:  Double,
+    ra:  DoubleRef,
+    dec: DoubleRef
   ): Unit = {
     var x = x0
     var y = y0
@@ -417,7 +402,7 @@ trait ImprovedSkyCalcMethods {
                                              returned in decimal hours and decimal degrees. */
     var mod = .0
     /* modulus */
-    var xy = .0 /* component in xy plane */
+    var xy  = .0 /* component in xy plane */
     /* normalize explicitly and check for bad input */
     mod = Math.sqrt(x * x + y * y + z * z)
     if (mod > 0.0) {
@@ -454,34 +439,34 @@ trait ImprovedSkyCalcMethods {
     * needed.
     */
   protected def aberrate(
-      epoch: Double,
-      vec: Array[Double],
-      from_std: Int
+    epoch:    Double,
+    vec:      Array[Double],
+    from_std: Int
   ): Unit = {
     /* 1 = apply aberration, -1 = take aberration out. */
-    var jd = .0
-    var jd1 = .0
-    var jd2 = .0
-    var Xdot = .0
-    var Ydot = .0
-    var Zdot = .0
+    var jd      = .0
+    var jd1     = .0
+    var jd2     = .0
+    var Xdot    = .0
+    var Ydot    = .0
+    var Zdot    = .0
     /* page C24 */
     /* throwaways */
-    val ras = new DoubleRef
-    val decs = new DoubleRef
-    val dists = new DoubleRef
-    val topora = new DoubleRef
+    val ras     = new DoubleRef
+    val decs    = new DoubleRef
+    val dists   = new DoubleRef
+    val topora  = new DoubleRef
     val topodec = new DoubleRef
-    val x = new DoubleRef
-    val y = new DoubleRef
-    val z = new DoubleRef
-    val x1 = new DoubleRef
-    val y1 = new DoubleRef
-    val z1 = new DoubleRef
-    val x2 = new DoubleRef
-    val y2 = new DoubleRef
-    val z2 = new DoubleRef
-    var norm = .0
+    val x       = new DoubleRef
+    val y       = new DoubleRef
+    val z       = new DoubleRef
+    val x1      = new DoubleRef
+    val y1      = new DoubleRef
+    val z1      = new DoubleRef
+    val x2      = new DoubleRef
+    val y2      = new DoubleRef
+    val z2      = new DoubleRef
+    var norm    = .0
     /* find heliocentric velocity of earth as a fraction of the speed of light ... */
     jd = J2000 + (epoch - 2000.0) * 365.25
     jd1 = jd - EARTH_DIFF
@@ -512,9 +497,7 @@ trait ImprovedSkyCalcMethods {
     var theta = .0
     if ((x == 0.0) && (y == 0.0)) return 0.0 /* guard ... */
     theta = Math.atan2(y, x)
-    while ({
-      theta < 0.0
-    }) theta += TWOPI
+    while (theta < 0.0) theta += TWOPI
     theta
   }
 
@@ -536,47 +519,47 @@ trait ImprovedSkyCalcMethods {
     * EARTH, referred to mean equator and equinox of date.
     */
   protected def accusun(
-      jd0: Double,
-      lst: Double,
-      geolat: Double,
-      ra: DoubleRef,
-      dec: DoubleRef,
-      dist: DoubleRef,
-      topora: DoubleRef,
-      topodec: DoubleRef,
-      x: DoubleRef,
-      y: DoubleRef,
-      z: DoubleRef
+    jd0:     Double,
+    lst:     Double,
+    geolat:  Double,
+    ra:      DoubleRef,
+    dec:     DoubleRef,
+    dist:    DoubleRef,
+    topora:  DoubleRef,
+    topodec: DoubleRef,
+    x:       DoubleRef,
+    y:       DoubleRef,
+    z:       DoubleRef
   ): Unit = {
-    var jd = jd0
-    var L = .0
-    var T = .0
-    var Tsq = .0
-    var Tcb = .0
-    var M = .0
-    var e = .0
-    var Cent = .0
-    var nu = .0
-    var sunlong = .0
-    var Mrad = .0
-    var nurad = .0
-    var R = .0
-    var A = .0
-    var B = .0
-    var C = .0
-    var D = .0
-    var E = .0
-    var H = .0
-    var xtop = .0
-    var ytop = .0
-    var ztop = .0
+    var jd       = jd0
+    var L        = .0
+    var T        = .0
+    var Tsq      = .0
+    var Tcb      = .0
+    var M        = .0
+    var e        = .0
+    var Cent     = .0
+    var nu       = .0
+    var sunlong  = .0
+    var Mrad     = .0
+    var nurad    = .0
+    var R        = .0
+    var A        = .0
+    var B        = .0
+    var C        = .0
+    var D        = .0
+    var E        = .0
+    var H        = .0
+    var xtop     = .0
+    var ytop     = .0
+    var ztop     = .0
     var topodist = .0
-    var l = .0
-    var m = .0
-    var n = .0
-    val xgeo = new DoubleRef
-    val ygeo = new DoubleRef
-    val zgeo = new DoubleRef
+    var l        = .0
+    var m        = .0
+    var n        = .0
+    val xgeo     = new DoubleRef
+    val ygeo     = new DoubleRef
+    val zgeo     = new DoubleRef
     jd = jd + etcorr(jd) / SEC_IN_DAY /* might as well do it right .... */
     T = (jd - 2415020.0) / 36525.0 /* 1900 --- this is an oldish theory*/
     Tsq = T * T
@@ -663,13 +646,11 @@ trait ImprovedSkyCalcMethods {
     */
   protected def etcorr(jd: Double): Double = {
     val dates = new Array[Double](22)
-    var year = .0
-    var delt = 0.0
-    var i = 0
+    var year  = .0
+    var delt  = 0.0
+    var i     = 0
     i = 0
-    while ({
-      i <= 19
-    }) {
+    while (i <= 19) {
       dates(i) = 1900 + i * 5.0
 
       i += 1
@@ -682,20 +663,16 @@ trait ImprovedSkyCalcMethods {
       delt = DELTS(i) + ((DELTS(i + 1) - DELTS(i)) / (dates(i + 1) - dates(
         i
       ))) * (year - dates(i))
-    } else {
-      if (year >= 1998.0 && year < 2100.0) {
-        delt = 33.15 + 2.164e-3 * (jd - 2436935.4) /* rough extrapolation */
-      } else {
-        if (year < 1900.0) {
-          System.out.println("etcorr ... no ephemeris time data for < 1900.\n")
-          delt = 0.0
-        } else if (year >= 2100.0) {
-          System.out.println(
-            "etcorr .. very long extrapolation in delta T - inaccurate.\n"
-          )
-          delt = 180.0 /* who knows? */
-        }
-      }
+    } else if (year >= 1998.0 && year < 2100.0)
+      delt = 33.15 + 2.164e-3 * (jd - 2436935.4) /* rough extrapolation */
+    else if (year < 1900.0) {
+      System.out.println("etcorr ... no ephemeris time data for < 1900.\n")
+      delt = 0.0
+    } else if (year >= 2100.0) {
+      System.out.println(
+        "etcorr .. very long extrapolation in delta T - inaccurate.\n"
+      )
+      delt = 180.0 /* who knows? */
     }
     delt
   }
@@ -716,9 +693,9 @@ trait ImprovedSkyCalcMethods {
   protected def eclrot(jd: Double, y: DoubleRef, z: DoubleRef): Unit = {
     var incl = .0
     //        double xpr;
-    var ypr = .0
-    var zpr = .0
-    var T = .0
+    var ypr  = .0
+    var zpr  = .0
+    var T    = .0
     T = (jd - J2000) / 36525 /* centuries since J2000 */
     incl = (23.439291 + T * (-0.0130042 - 0.00000016 * T)) / DEG_IN_RADIAN
     /* 1992 Astron Almanac, p. B18, dropping the
@@ -731,15 +708,15 @@ trait ImprovedSkyCalcMethods {
   }
 
   protected def eclrot(
-      jd: Double,
-      @SuppressWarnings(Array("unused")) x: DoubleRef,
-      y: DoubleRef,
-      z: DoubleRef
+    jd:        Double,
+    @unused x: DoubleRef,
+    y:         DoubleRef,
+    z:         DoubleRef
   ): Unit = {
-    var incl = .0
+    var incl          = .0
     var /*xpr, */ ypr = .0
-    var zpr = .0
-    var T = .0
+    var zpr           = .0
+    var T             = .0
     T = (jd - J2000) / 36525
     incl = (23.439291 + T * (-0.0130042 - 0.00000016 * T)) / DEG_IN_RADIAN
     ypr = Math.cos(incl) * y.d - Math.sin(incl) * z.d
@@ -756,18 +733,18 @@ trait ImprovedSkyCalcMethods {
     * p. K11
     */
   protected def geocent(
-      geolong0: Double,
-      geolat0: Double,
-      height: Double,
-      x_geo: DoubleRef,
-      y_geo: DoubleRef,
-      z_geo: DoubleRef
+    geolong0: Double,
+    geolat0:  Double,
+    height:   Double,
+    x_geo:    DoubleRef,
+    y_geo:    DoubleRef,
+    z_geo:    DoubleRef
   ): Unit = {
     var geolong = geolong0
-    var geolat = geolat0
-    var denom = .0
-    var C_geo = .0
-    var S_geo = .0
+    var geolat  = geolat0
+    var denom   = .0
+    var C_geo   = .0
+    var S_geo   = .0
     geolat = geolat / DEG_IN_RADIAN
     geolong = geolong / HRS_IN_RADIAN
     denom = (1.0 - FLATTEN) * Math.sin(geolat)
@@ -790,12 +767,8 @@ trait ImprovedSkyCalcMethods {
     var x = x0
     if (Math.abs(x) < 100000.0) {
       /* too inefficient for this! */
-      while ({
-        x > 12.0
-      }) x = x - 24.0
-      while ({
-        x < -12.0
-      }) x = x + 24.0
+      while (x > 12.0) x = x - 24.0
+      while (x < -12.0) x = x + 24.0
     } else System.out.println("Out of bounds in adj_time!\n")
     x
   }
@@ -812,25 +785,25 @@ trait ImprovedSkyCalcMethods {
     * @return the parallactic angle in degrees
     */
   protected def altit(
-      dec0: Double,
-      ha0: Double,
-      lat0: Double,
-      az: DoubleRef,
-      parang: DoubleRef
+    dec0:   Double,
+    ha0:    Double,
+    lat0:   Double,
+    az:     DoubleRef,
+    parang: DoubleRef
   ): Double = {
-    var dec = dec0
-    var ha = ha0
-    var lat = lat0
-    var x = .0
-    var y = .0
-    var z = .0
-    var sinp = .0
-    var cosp = .0
+    var dec    = dec0
+    var ha     = ha0
+    var lat    = lat0
+    var x      = .0
+    var y      = .0
+    var z      = .0
+    var sinp   = .0
+    var cosp   = .0
     /* sin and cos of parallactic angle */
     var cosdec = .0
     var sindec = .0
-    var cosha = .0
-    var sinha = .0
+    var cosha  = .0
+    var sinha  = .0
     var coslat = .0
     var sinlat = .0
     /* time-savers ... */
@@ -867,12 +840,8 @@ trait ImprovedSkyCalcMethods {
     if (lat >= 0.0) parang.d = 180.0
     else parang.d = 0.0
     az.d *= DEG_IN_RADIAN /* done with taking trig functions of it ... */
-    while ({
-      az.d < 0.0
-    }) az.d += 360.0 /* force 0 -> 360 */
-    while ({
-      az.d >= 360.0
-    }) az.d -= 360.0
+    while (az.d < 0.0) az.d += 360.0 /* force 0 -> 360 */
+    while (az.d >= 360.0) az.d -= 360.0
     x
   }
 
@@ -908,23 +877,21 @@ trait ImprovedSkyCalcMethods {
     */
   protected def true_airmass(secz: Double): Double = {
     var seczmin1 = .0
-    var i = 0
-    val ord = 4
-    val coef = new Array[Double](5)
-    var result = 0.0
+    var i        = 0
+    val ord      = 4
+    val coef     = new Array[Double](5)
+    var result   = 0.0
     coef(1) = 2.879465e-3 /* sun compilers do not allow automatic
                 initializations of arrays. */
     coef(2) = 3.033104e-3
     coef(3) = 1.351167e-3
     coef(4) = -4.716679e-5
-    if (secz < 0.0) return -(1.0) /* out of range. */
+    if (secz < 0.0) return -1.0 /* out of range. */
     if (secz > 12) return secz - 1.5 /* shouldn't happen .... */
     seczmin1 = secz - 1.0
     /* evaluate polynomial ... */
     i = ord
-    while ({
-      i > 0
-    }) {
+    while (i > 0) {
       result = (result + coef(i)) * seczmin1
 
       i -= 1
@@ -935,19 +902,20 @@ trait ImprovedSkyCalcMethods {
   }
 
   protected def date_to_jd(date: DateTime): Double = {
-    var yr1 = 0
-    var mo1 = 1
-    val jdzpt = 1720982
-    var jdint = 0L
-    var inter = 0L
-    var jd = .0
+    var yr1    = 0
+    var mo1    = 1
+    val jdzpt  = 1720982
+    var jdint  = 0L
+    var inter  = 0L
+    var jd     = .0
     var jdfrac = .0
-    if ((date.y <= 1900) | (date.y >= 2100)) { //        printf("Date out of range.  1900 - 2100 only.\n");
+    if (
+      (date.y <= 1900) | (date.y >= 2100)
+    ) //        printf("Date out of range.  1900 - 2100 only.\n");
       //        return(0.);
       throw new IllegalArgumentException(
         "Date out of range.  1900 - 2100 only."
       )
-    }
     if (date.mo <= 2) {
       yr1 = -1
       mo1 = 13
@@ -974,13 +942,13 @@ trait ImprovedSkyCalcMethods {
     * is about a millisecond in the 1990s.
     */
   protected def lst(jd: Double, longit: Double): Double = {
-    var t = .0
-    var ut = .0
-    var jdmid = .0
-    var jdint = .0
-    var jdfrac = .0
-    var sid_g = .0
-    var jdin = 0L
+    var t       = .0
+    var ut      = .0
+    var jdmid   = .0
+    var jdint   = .0
+    var jdfrac  = .0
+    var sid_g   = .0
+    var jdin    = 0L
     var sid_int = 0L
     jdin = jd.toLong /* fossil code from earlier package which
                                        split jd into integer and fractional parts ... */
@@ -1015,58 +983,59 @@ trait ImprovedSkyCalcMethods {
     * @param sZD   Sun zenith distance [deg]
     */
   protected def sb(
-      mpa: Double,
-      mdist: Double,
-      mZD: Double,
-      ZD: Double,
-      sZD: Double
+    mpa:   Double,
+    mdist: Double,
+    mZD:   Double,
+    ZD:    Double,
+    sZD:   Double
   ): Double = {
     val degrad = 57.2957795130823d
-    val k = 0.172d // ; mag/airmass for Hale Pohaku
-    val a = 2.51189d
-    val Q = 27.78151d
+    val k      = 0.172d      // ; mag/airmass for Hale Pohaku
+    val a      = 2.51189d
+    val Q      = 27.78151d
     val saltit = 90.0d - sZD // ; Sun's altitude
     //    ; Dark sky zenith V surface brightness
     //    Vzen = dblarr(n_elements(ZD))
     //    Vzen[*] = 21.587d
-    var Vzen = 21.587d
+    var Vzen   = 21.587d
     //    ; Correct for brightening due to twilight
     //    ii = where(saltit gt -18.5)
     //    if (ii[0] ne -1) then Vzen[ii] = Vzen[ii] - ztwilight(saltit[ii])
     if (saltit > -18.5) Vzen -= ztwilight(saltit)
     //     Bzen = 0.263d *          a^(Q-Vzen)     ; zenith sky brightness
-    val Bzen = 0.263d * Math.pow(a, Q - Vzen)
+    val Bzen   = 0.263d * Math.pow(a, Q - Vzen)
     // ; sky constribution
     //     Bsky =Bzen*xair(ZD)*          10.^(-0.4d*k*(xair(ZD)-1.0d))
-    val Bsky = Bzen * xair(ZD) * Math.pow(10, -(0.4d) * k * (xair(ZD) - 1.0d))
+    val Bsky   = Bzen * xair(ZD) * Math.pow(10, -0.4d * k * (xair(ZD) - 1.0d))
     // ; moon contribution
     // n=n_elements(Bsky)
     //     istar=0.0d & fp=0.0d & Bmoon=dblarr(n)
-    var istar = 0.0d
-    var fp = 0.0d
-    var Bmoon = 0.0
+    var istar  = 0.0d
+    var fp     = 0.0d
+    var Bmoon  = 0.0
     if (mZD <= 90.8) { //      istar=         10^ (-0.4d*(3.84d + 0.026d*abs(mpa) + (4.d-9)*          mpa^ 4))
       istar = Math.pow(
         10,
-        -(0.4d) * (3.84d + 0.026d * Math.abs(mpa) + (4.0e-9) * Math.pow(mpa, 4))
+        -0.4d * (3.84d + 0.026d * Math.abs(mpa) + 4.0e-9 * Math.pow(mpa, 4))
       )
-      if (mdist >= 10.0) { //        fp=(1.06d +          cos(mdist[j]/degrad)^ 2) *         10^ 5.36d  +          10^ (6.15d - mdist[j]/40.0d) $
+      if (
+        mdist >= 10.0
+      )                //        fp=(1.06d +          cos(mdist[j]/degrad)^ 2) *         10^ 5.36d  +          10^ (6.15d - mdist[j]/40.0d) $
         fp = (1.06d + Math.pow(Math.cos(mdist / degrad), 2)) * Math.pow(
           10,
           5.36d
         ) + Math.pow(10, 6.15d - mdist / 40.0d)
-      } else { //          fp=6.2d7/         mdist^ 2;
+      else             //          fp=6.2d7/         mdist^ 2;
         fp = 6.2e7 / Math.pow(mdist, 2)
-      }
       //      Bmoon[j]=fp*istar*         10^ (-0.4d*k*xair(mZD[j]))*(1.0d -          10^ (-0.4d*k*xair(ZD[j])))
-      Bmoon = fp * istar * Math.pow(10, -(0.4d) * k * xair(mZD)) * (1.0d - Math
-        .pow(10, -(0.4d) * k * xair(ZD)))
+      Bmoon = fp * istar * Math.pow(10, -0.4d * k * xair(mZD)) * (1.0d - Math
+        .pow(10, -0.4d * k * xair(ZD)))
     }
     //    ;print,istar,fp,Bmoon,Bsky
     //    ;print,Q-alog10((Bsky)/0.263)/alog10(a),Q-alog10((Bmoon)/0.263)/alog10(a)
     //    ; sky brightness in Vmag/arcsec^2
     //  return Q-    alog10((Bmoon+Bsky)/0.263)/    alog10(a);
-    val ret = Q - Math.log10((Bmoon + Bsky) / 0.263) / Math.log10(a)
+    val ret    = Q - Math.log10((Bmoon + Bsky) / 0.263) / Math.log10(a)
     //    System.out.printf("sb(%1.2f, %1.2f, %1.2f, %1.2f, %1.2f) => %1.3f\n", mpa, mdist, mZD, ZD, sZD, ret);
     ret
   }
@@ -1078,23 +1047,23 @@ trait ImprovedSkyCalcMethods {
   }
 
   protected def lunskybright(
-      alpha0: Double,
-      rho: Double,
-      kzen: Double,
-      altmoon: Double,
-      alt: Double,
-      moondist0: Double
+    alpha0:    Double,
+    rho:       Double,
+    kzen:      Double,
+    altmoon:   Double,
+    alt:       Double,
+    moondist0: Double
   ): Double = {
-    var alpha = alpha0
+    var alpha    = alpha0
     var moondist = moondist0
-    var istar = .0
-    var Xzm = .0
-    var Xo = .0
-    var Z = .0
-    var Zmoon = .0
-    var Bmoon = .0
-    var fofrho = .0
-    var rho_rad = .0 //,test;
+    var istar    = .0
+    var Xzm      = .0
+    var Xo       = .0
+    var Z        = .0
+    var Zmoon    = .0
+    var Bmoon    = .0
+    var fofrho   = .0
+    var rho_rad  = .0 //,test;
     rho_rad = rho / DEG_IN_RADIAN
     alpha = 180.0 - alpha
     Zmoon = (90.0 - altmoon) / DEG_IN_RADIAN
@@ -1121,53 +1090,53 @@ trait ImprovedSkyCalcMethods {
     Xo = Math.sqrt(1.0 - 0.96 * Math.sin(Z) * Math.sin(Z))
     if (Xo != 0.0) Xo = 1.0 / Xo
     else Xo = 10000.0
-    Bmoon = fofrho * istar * Math.pow(10.0, -(0.4) * kzen * Xzm) * (1.0 - Math
-      .pow(10.0, -(0.4) * kzen * Xo)) /* nanoLamberts */
+    Bmoon = fofrho * istar * Math.pow(10.0, -0.4 * kzen * Xzm) * (1.0 - Math
+      .pow(10.0, -0.4 * kzen * Xo)) /* nanoLamberts */
     if (Bmoon > 0.001)
       22.50 - 1.08574 * Math.log(Bmoon / 34.08) /* V mag per sq arcs-eqn 1 */
     else 99.0
   }
 
   protected def accumoon(
-      jd0: Double,
-      geolat: Double,
-      lst: Double,
-      elevsea: Double,
-      geora: DoubleRef,
-      geodec: DoubleRef,
-      geodist: DoubleRef,
-      topora: DoubleRef,
-      topodec: DoubleRef,
-      topodist: DoubleRef
+    jd0:      Double,
+    geolat:   Double,
+    lst:      Double,
+    elevsea:  Double,
+    geora:    DoubleRef,
+    geodec:   DoubleRef,
+    geodist:  DoubleRef,
+    topora:   DoubleRef,
+    topodec:  DoubleRef,
+    topodist: DoubleRef
   ): Unit = {
-    var jd = jd0
+    var jd     = jd0
     /*      double *eclatit,*eclongit, *pie,*ra,*dec,*dist; geocent quantities,
                        formerly handed out but not in this version */
-    var pie = .0
-    var dist = .0
+    var pie    = .0
+    var dist   = .0
     /* horiz parallax */
-    var Lpr = .0
-    var M = .0
-    var Mpr = .0
-    var D = .0
-    var F = .0
-    var Om = .0
-    var T = .0
-    var Tsq = .0
-    var Tcb = .0
-    var e = .0
+    var Lpr    = .0
+    var M      = .0
+    var Mpr    = .0
+    var D      = .0
+    var F      = .0
+    var Om     = .0
+    var T      = .0
+    var Tsq    = .0
+    var Tcb    = .0
+    var e      = .0
     var lambda = .0
-    var B = .0
-    var beta = .0
-    var om1 = .0
-    var om2 = .0
-    var sinx = .0
-    var x = .0
-    var y = .0
-    var z = .0
-    val x_geo = new DoubleRef
-    val y_geo = new DoubleRef
-    val z_geo = new DoubleRef
+    var B      = .0
+    var beta   = .0
+    var om1    = .0
+    var om2    = .0
+    var sinx   = .0
+    var x      = .0
+    var y      = .0
+    var z      = .0
+    val x_geo  = new DoubleRef
+    val y_geo  = new DoubleRef
+    val z_geo  = new DoubleRef
     //            double x_geo, y_geo, z_geo;  /* geocentric position of *observer* */
     jd = jd + etcorr(
       jd
@@ -1354,9 +1323,9 @@ trait ImprovedSkyCalcMethods {
     ) + e * 0.000019 * Math.cos(4 * D - M - Mpr)
     beta = beta / DEG_IN_RADIAN
     lambda = lambda / DEG_IN_RADIAN
-    val l = new DoubleRef(Math.cos(lambda) * Math.cos(beta))
-    val m = new DoubleRef(Math.sin(lambda) * Math.cos(beta))
-    val n = new DoubleRef(Math.sin(beta))
+    val l      = new DoubleRef(Math.cos(lambda) * Math.cos(beta))
+    val m      = new DoubleRef(Math.sin(lambda) * Math.cos(beta))
+    val n      = new DoubleRef(Math.sin(beta))
     eclrot(jd, l, m, n)
     dist = 1 / Math.sin(pie / DEG_IN_RADIAN)
     x = l.d * dist
@@ -1391,7 +1360,7 @@ trait ImprovedSkyCalcMethods {
      * Comparison with Ashburn, E. V. 1952, JGR, v.57, p.85 shows that this
      * is a good fit to his B-band measurements.
      */
-    var y = .0
+    var y     = .0
     var `val` = .0
     y = (-1.0 * alt - 9.0) / 9.0 /* my polynomial's argument... */
     `val` = ((2.0635175 * y + 1.246602) * y - 9.4084495) * y + 6.132725
@@ -1399,26 +1368,26 @@ trait ImprovedSkyCalcMethods {
   }
 
   protected def subtend(
-      ra01: Double,
-      dec01: Double,
-      ra02: Double,
-      dec02: Double
+    ra01:  Double,
+    dec01: Double,
+    ra02:  Double,
+    dec02: Double
   ): Double = {
-    var ra1 = ra01
-    var dec1 = dec01
-    var ra2 = ra02
-    var dec2 = dec02
+    var ra1   = ra01
+    var dec1  = dec01
+    var ra2   = ra02
+    var dec2  = dec02
     /*
      * angle subtended by two positions in the sky -- return value is in
      * radians. Hybrid algorithm works down to zero separation except very
      * near the poles.
      */
-    var x1 = .0
-    var y1 = .0
-    var z1 = .0
-    var x2 = .0
-    var y2 = .0
-    var z2 = .0
+    var x1    = .0
+    var y1    = .0
+    var z1    = .0
+    var x2    = .0
+    var y2    = .0
+    var z2    = .0
     var theta = .0
     ra1 = ra1 / HRS_IN_RADIAN
     dec1 = dec1 / DEG_IN_RADIAN
@@ -1435,7 +1404,7 @@ trait ImprovedSkyCalcMethods {
      * use flat Pythagorean approximation if the angle is very small and*
      * you're not close to the pole; avoids roundoff in arccos.
      */
-    if (theta < 1.0e-5) {
+    if (theta < 1.0e-5)
       /* seldom the case, so don't combine test */
       if (
         Math.abs(dec1) < (Math.PI / 2.0 - 0.001) && Math.abs(dec2) < (
@@ -1447,7 +1416,6 @@ trait ImprovedSkyCalcMethods {
         x2 = dec2 - dec1
         theta = Math.sqrt(x1 * x1 + x2 * x2)
       }
-    }
     theta
   }
 }

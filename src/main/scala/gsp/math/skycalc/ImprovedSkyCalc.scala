@@ -1,8 +1,12 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package gsp.math.skycalc
 
-import gem.enum.Site
 import java.time.Instant
 import java.time.ZonedDateTime
+
+import gem.enum.Site
 import gsp.math.Coordinates
 
 /**
@@ -13,40 +17,40 @@ import gsp.math.Coordinates
 final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
 
   // Site parameters
-  private var hoursLongitude = .0
+  private var hoursLongitude  = .0
   private var degreesLatitude = .0
-  private var siteAltitude = .0
+  private var siteAltitude    = .0
 
   // calculated results
-  private var altitude = .0
-  private var hourAngle = .0
-  private var azimuth = .0
-  private var parallacticAngle = .0
-  private var airmass = .0
+  private var altitude                             = .0
+  private var hourAngle                            = .0
+  private var azimuth                              = .0
+  private var parallacticAngle                     = .0
+  private var airmass                              = .0
   private var lunarSkyBrightness: java.lang.Double = .0
-  private var lunarDistance = .0
-  private var lunarIlluminatedFraction = .0
-  private var totalSkyBrightness = .0
-  private var lunarPhaseAngle = .0
-  private var sunAltitude = .0
-  private var lunarElevation = .0
+  private var lunarDistance                        = .0
+  private var lunarIlluminatedFraction             = .0
+  private var totalSkyBrightness                   = .0
+  private var lunarPhaseAngle                      = .0
+  private var sunAltitude                          = .0
+  private var lunarElevation                       = .0
 
   // caching for calculate()
   private var cachedCoordinates: Coordinates = null
-  private var cachedInstant: Instant = null
-  private var cachedCalculateMoon: Boolean = false
+  private var cachedInstant: Instant         = null
+  private var cachedCalculateMoon: Boolean   = false
 
   def this(site: Site) = {
     this()
     hoursLongitude = -site.longitude.toDoubleDegrees / 15.0
     degreesLatitude = site.latitude.toDoubleDegrees
-    siteAltitude = site.altitude
+    siteAltitude = site.altitude.toDouble
   }
 
   def calculate(
-      coords: Coordinates,
-      instant: Instant,
-      calculateMoon: Boolean
+    coords:        Coordinates,
+    instant:       Instant,
+    calculateMoon: Boolean
   ): Unit = { // Early exit if the parameters haven't changed.
     if (
       coords.equals(cachedCoordinates) && instant.equals(
@@ -57,12 +61,12 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
     cachedInstant = instant
     cachedCalculateMoon = calculateMoon
     val dateTime = DateTime(instant)
-    val jdut = new DoubleRef
-    val sid = new DoubleRef
+    val jdut     = new DoubleRef
+    val sid      = new DoubleRef
     val curepoch = new DoubleRef
     setup_time_place(dateTime, hoursLongitude, jdut, sid, curepoch)
-    val objra = coords.ra.toAngle.toDoubleDegrees / 15
-    val objdec = coords.dec.toAngle.toDoubleDegrees
+    val objra    = coords.ra.toAngle.toDoubleDegrees / 15
+    val objdec   = coords.dec.toAngle.toDoubleDegrees
     val objepoch = 2000.0
     getCircumstances(
       objra,
@@ -77,20 +81,20 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
   }
 
   private def getCircumstances(
-      objra: Double,
-      objdec: Double,
-      objepoch: Double,
-      curep: Double,
-      sid: Double,
-      lat: Double,
-      jdut: DoubleRef,
-      calculateMoon: Boolean
+    objra:         Double,
+    objdec:        Double,
+    objepoch:      Double,
+    curep:         Double,
+    sid:           Double,
+    lat:           Double,
+    jdut:          DoubleRef,
+    calculateMoon: Boolean
   ): Unit = {
-    var ha = .0
-    var alt = .0
-    val az = new DoubleRef
-    val par = new DoubleRef
-    val curra = new DoubleRef
+    var ha     = .0
+    var alt    = .0
+    val az     = new DoubleRef
+    val par    = new DoubleRef
+    val curra  = new DoubleRef
     val curdec = new DoubleRef
     cooxform(
       objra,
@@ -110,21 +114,21 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
     parallacticAngle = par.d
     hourAngle = ha
     if (calculateMoon) {
-      val ramoon = new DoubleRef
-      val decmoon = new DoubleRef
-      val distmoon = new DoubleRef
-      val georamoon = new DoubleRef
-      val geodecmoon = new DoubleRef
+      val ramoon      = new DoubleRef
+      val decmoon     = new DoubleRef
+      val distmoon    = new DoubleRef
+      val georamoon   = new DoubleRef
+      val geodecmoon  = new DoubleRef
       val geodistmoon = new DoubleRef
-      val rasun = new DoubleRef
-      val decsun = new DoubleRef
-      val distsun = new DoubleRef
-      val x = new DoubleRef
-      val y = new DoubleRef
-      val z = new DoubleRef
-      val toporasun = new DoubleRef
-      val topodecsun = new DoubleRef
-      val elevsea = siteAltitude
+      val rasun       = new DoubleRef
+      val decsun      = new DoubleRef
+      val distsun     = new DoubleRef
+      val x           = new DoubleRef
+      val y           = new DoubleRef
+      val z           = new DoubleRef
+      val toporasun   = new DoubleRef
+      val topodecsun  = new DoubleRef
+      val elevsea     = siteAltitude
       accusun(
         jdut.d,
         sid,
@@ -157,8 +161,7 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
         decmoon,
         distmoon
       )
-      lunarElevation =
-        altit(decmoon.d, sid - ramoon.d, degreesLatitude, az, new DoubleRef)
+      lunarElevation = altit(decmoon.d, sid - ramoon.d, degreesLatitude, az, new DoubleRef)
       // Sky brightness
       lunarSkyBrightness = null
       lunarDistance =
@@ -185,7 +188,6 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
       lunarIlluminatedFraction = (0.5 * (1.0 - Math.cos(
         subtend(ramoon.d, decmoon.d, rasun.d, decsun.d)
       )))
-        .asInstanceOf[Float]
     }
   }
 
@@ -194,7 +196,7 @@ final class ImprovedSkyCalc extends ImprovedSkyCalcMethods {
     */
   def getLst(instant: Instant): ZonedDateTime = {
     val dateTime = DateTime(instant)
-    val jd = date_to_jd(dateTime)
+    val jd       = date_to_jd(dateTime)
     val lstHours = lst(jd, hoursLongitude)
     getLst(lstHours, instant)
   }

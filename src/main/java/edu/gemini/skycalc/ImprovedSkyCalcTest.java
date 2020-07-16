@@ -1,7 +1,6 @@
 package edu.gemini.skycalc;
 
 import edu.gemini.spModel.core.*;
-import jsky.coords.WorldCoords;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -36,39 +35,25 @@ public final class ImprovedSkyCalcTest extends ImprovedSkyCalcMethods {
     private double sunAltitude;
     private double lunarElevation;
 
-    // caching for calculate()
-    private WorldCoords cachedCoordinates;
-    private Date cachedDate;
-    private boolean cachedCalculateMoon;
-
     public ImprovedSkyCalcTest(final double longitudeDeg, final double latitudeDeg, final int altitude) {
         hoursLongitude = -longitudeDeg/15.;
         degreesLatitude = latitudeDeg;
         siteAltitude = altitude;
     }
 
-    public void calculate(final WorldCoords obj, final Instant instant, final boolean calculateMoon) {
+    public void calculate(final double raDeg, final double decDeg, final Instant instant, final boolean calculateMoon) {
         final Date date = Date.from(instant);
 
-    	// Early exit if the parameters haven't changed.
-    	if (obj.equals(cachedCoordinates) &&
-    		date.equals(cachedDate) &&
-    		calculateMoon == cachedCalculateMoon)
-    		return;
-
-    	cachedCoordinates = obj;
-    	cachedDate = date;
-    	cachedCalculateMoon = calculateMoon;
-
         final DateTime dateTime = new DateTime(date);
+
         final DoubleRef jdut = new DoubleRef();
         final DoubleRef sid = new DoubleRef();
         final DoubleRef curepoch = new DoubleRef();
 
         setup_time_place(dateTime, hoursLongitude, jdut, sid, curepoch);
 
-        final double objra = obj.getRaDeg()/15;
-        final double objdec = obj.getDecDeg();
+        final double objra = raDeg/15;
+        final double objdec = decDeg;
         final double objepoch = 2000.;
 
         getCircumstances(objra, objdec, objepoch, curepoch.d, sid.d, degreesLatitude, jdut, calculateMoon);
