@@ -3,6 +3,8 @@ package edu.gemini.skycalc;
 import edu.gemini.spModel.core.*;
 import jsky.coords.WorldCoords;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 import static java.lang.Math.cos;
 import java.util.Date;
@@ -136,11 +138,12 @@ public final class ImprovedSkyCalcTest extends ImprovedSkyCalcMethods {
     /**
      * Return the LST time for the given UT time at the given site.
      */
-    public Date getLst(final Date date) {
+    public ZonedDateTime getLst(final Instant instant) {
+        final Date date = Date.from(instant);
         final DateTime dateTime = new DateTime(date);
         final double jd = date_to_jd(dateTime);
         final double lstHours = lst(jd, hoursLongitude);
-        return getLst(lstHours, date);
+        return ZonedDateTime.ofInstant(getLst(lstHours, date).toInstant(), ZoneId.of("UT"));
     }
 
     public double getAltitude() {

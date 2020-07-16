@@ -22,10 +22,13 @@ object Main {
       coords.dec.toAngle.toDoubleDegrees
     )
 
-  private val NanosPerMillis: Long = 1_000_000
+  private val NanosPerMillis: Int = 1_000_000
 
   private def truncateInstantToMillis(i: Instant): Instant = {
-    Instant.ofEpochMilli(i.toEpochMilli / NanosPerMillis * NanosPerMillis)
+    Instant.ofEpochSecond(
+      i.getEpochSecond,
+      i.getNano / NanosPerMillis * NanosPerMillis
+    )
   }
 
   def main(args: Array[String]) = {
@@ -50,7 +53,7 @@ object Main {
     println(calc.getAltitude)
     println(javaCalc.getAltitude)
 
-    // println(calc.getLst(now))
-    // println(javaCalc.getLst(now))
+    println(truncateInstantToMillis(calc.getLst(now).toInstant).toEpochMilli)
+    println(javaCalc.getLst(now).toInstant.toEpochMilli)
   }
 }
